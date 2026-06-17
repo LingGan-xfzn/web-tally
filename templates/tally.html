@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>{% if channel == 0 %}导播监看{% else %}机位 {{ channel }}{% endif %}</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    {% if channel == 0 %}
+    <!-- 导播位全屏：机位 + 特殊通道 -->
+    <div class="tally-director-full">
+        <div class="monitor-block tally-idle" id="cam1"><span class="monitor-num">1</span></div>
+        <div class="monitor-block tally-idle" id="cam2"><span class="monitor-num">2</span></div>
+        <div class="monitor-block tally-idle" id="cam3"><span class="monitor-num">3</span></div>
+        <div class="monitor-block tally-idle" id="cam4"><span class="monitor-num">4</span></div>
+        <div class="monitor-block tally-idle" id="spec3010"><span class="monitor-num special-num">Still1</span></div>
+        <div class="monitor-block tally-idle" id="spec3020"><span class="monitor-num special-num">Still2</span></div>
+        <div class="monitor-block tally-idle" id="spec4001"><span class="monitor-num special-num">AUX</span></div>
+        <div class="monitor-block tally-idle" id="spec5001"><span class="monitor-num special-num">S/SRC</span></div>
+    </div>
+    {% else %}
+    <!-- 单机位全屏 -->
+    <div class="tally-page tally-idle" id="tallyPage">
+        <div class="tally-number">{{ channel }}</div>
+    </div>
+    <div class="tally-status" id="tallyStatus"></div>
+    {% endif %}
+
+    <div class="tally-info">
+        <span>{% if channel == 0 %}导播监看{% else %}机位 {{ channel }}{% endif %} · 潍坊工商融媒体中心</span>
+        <a href="/" class="tally-release" id="releaseBtn">断开</a>
+    </div>
+
+    <div class="disconnect-overlay" id="disconnectOverlay" style="display:none;">
+        <div class="dot-pulse"></div>
+        <span>连接断开，重连中...</span>
+    </div>
+
+    <div class="error-overlay" id="errorOverlay" style="display:none;">
+        <span id="errorMsg">机位已被占用</span>
+        <a href="/" class="back-btn">返回选择</a>
+    </div>
+
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script>
+    const MY_CHANNEL = {{ channel }};
+    const IS_DIRECTOR = MY_CHANNEL === 0;
+    const socket = io();
+    let channelConfirmed = IS_DIRECTOR;  // 导播位无需确认
+    let retryCount = 0;
+
+    sessionStorage.setItem("tally_channel", MY_CHANNEL);
+
+    // ----------------------------------------------------------------
+    // 颜色更新
+    // ----------------------------------------------------------------
+    function updateTallyColor(pgm, pvw, transition) {
+        if (IS_DIRECTOR) {
+            for (let i = 1; i <= 4; i++) {
+                const el = document.getElementById("cam" + i);
+                if (!el) continue;
+                el.classList.remove("tally-pgm", "tally-pvw", "tally-idle");
+                // 过渡中：PGM和PVW机位同时红
+                if (transition && (pgm === i || pvw === i)) {
+                    el.classList.add("tally-pgm");
+                } else if (pgm === i) {
+                    el.classList.add("tally-pgm");
+                } else if (pvw === i) {
+                    el.classList.add("tally-pvw");
+                } else {
+                    el.classList.add("tally-idle");
+                }
+            }
+            const specs = {3010:"spec3010",3020:"spec3020",4001:"spec4001",5001:"spec5001"};
+            for (const [v,id] of Object.entries(specs)) {
+                const el = document.getElementById(id);
+                if (!el) continue;
+                const val = parseInt(v);
+                el.classList.remove("tally-pgm","tally-pvw","tally-idle");
+                if (transition && (pgm === val || pvw === val)) {
+                    el.classList.add("tally-pgm");
+                } else if (pgm === val) {
+                    el.classList.add("tally-pgm");
+                } else if (pvw === val) {
+                    el.classList.add("tally-pvw");
+                } else {
+                    el.classList.add("tally-idle");
+                }
+            }
+        } else {
+            const page = document.getElementById("tallyPage");
+            const status = document.getElementById("tallyStatus");
+            let css = "tally-idle", txt = "待机";
+            // 过渡中：PGM和PVW机位同时红
+            if (transition && (MY_CHANNEL === pgm || MY_CHANNEL === pvw)) {
+                css = "tally-pgm"; txt = "过渡";
+            } else if (MY_CHANNEL === pgm) {
+                css = "tally-pgm"; txt = "PGM";
+            } else if (MY_CHANNEL === pvw) {
+                css = "tally-pvw"; txt = "PVW";
+            }
+            if (pgm === MY_CHANNEL && pvw === MY_CHANNEL) { css = "tally-pgm"; txt = "PGM"; }
+            page.className = "tally-page " + css;
+            if (status) status.textContent = txt;
+        }
+    }
+
+    // ----------------------------------------------------------------
+    // WebSocket 事件
+    // ----------------------------------------------------------------
+    socket.on("connect", function() {
+        document.getElementById("disconnectOverlay").style.display = "none";
+        if (!IS_DIRECTOR && !channelConfirmed) {
+            // 延迟发送避免旧 session 还没释放的竞态
+            setTimeout(() => {
+                socket.emit("select_channel", { channel: MY_CHANNEL, force: true });
+            }, 600);
+        }
+    });
+
+    socket.on("disconnect", function() {
+        document.getElementById("disconnectOverlay").style.display = "flex";
+    });
+
+    socket.on("tally_update", function(data) {
+        updateTallyColor(data.pgm, data.pvw, data.transition || 0);
+    });
+
+    socket.on("connection_status", function(data) {
+        if (data.pgm !== undefined && data.pvw !== undefined) {
+            updateTallyColor(data.pgm, data.pvw, data.transition || 0);
+        }
+    });
+
+    socket.on("channel_assigned", function(data) {
+        channelConfirmed = true;
+        document.getElementById("errorOverlay").style.display = "none";
+        console.log("机位 " + data.channel + " 已确认");
+    });
+
+    socket.on("channel_rejected", function(data) {
+        if (!channelConfirmed) {
+            retryCount++;
+            if (retryCount <= 3) {
+                // 重试
+                setTimeout(() => {
+                    socket.emit("select_channel", { channel: MY_CHANNEL, force: true });
+                }, 1000);
+            } else {
+                // 3 次失败后显示错误
+                document.getElementById("errorMsg").textContent = data.reason || "机位已被占用";
+                document.getElementById("errorOverlay").style.display = "flex";
+            }
+        }
+    });
+
+    // ----------------------------------------------------------------
+    // 0.2 秒轮询验证（防止状态卡死）
+    // ----------------------------------------------------------------
+    let lastPgm = 0, lastPvw = 0, lastTransition = 0;
+    socket.on("tally_update", function(data) {
+        lastPgm = data.pgm;
+        lastPvw = data.pvw;
+        lastTransition = data.transition || 0;
+    });
+
+    setInterval(() => {
+        if (socket.connected) {
+            fetch("/api/state")
+                .then(r => r.json())
+                .then(s => {
+                    if (s.pgm !== lastPgm || s.pvw !== lastPvw || s.transition !== lastTransition) {
+                        lastPgm = s.pgm;
+                        lastPvw = s.pvw;
+                        lastTransition = s.transition || 0;
+                        updateTallyColor(s.pgm, s.pvw, s.transition || 0);
+                    }
+                    if (!s.switcher_connected) {
+                        document.getElementById("disconnectOverlay").style.display = "flex";
+                    }
+                })
+                .catch(() => {});
+        }
+    }, 200);
+
+    // ----------------------------------------------------------------
+    // 防息屏
+    // ----------------------------------------------------------------
+    let wakeLock = null;
+    async function requestWakeLock() {
+        try {
+            if ("wakeLock" in navigator) {
+                wakeLock = await navigator.wakeLock.request("screen");
+            }
+        } catch(e) {}
+    }
+    requestWakeLock();
+    document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") requestWakeLock();
+    });
+
+    // ----------------------------------------------------------------
+    // 断开按钮
+    // ----------------------------------------------------------------
+    document.getElementById("releaseBtn").addEventListener("click", function(e) {
+        e.preventDefault();
+        socket.emit("release_channel");
+        sessionStorage.removeItem("tally_channel");
+        window.location.href = "/";
+    });
+    </script>
+</body>
+</html>

@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Tally 机位选择</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="select-page">
+
+    <div class="select-header">
+        <h1>Tally 机位选择</h1>
+        <div class="switcher-status">
+            <span class="status-dot" id="statusDot"></span>
+            <span id="statusText">连接中...</span>
+        </div>
+    </div>
+
+    <div class="channel-grid" id="channelGrid">
+        <!-- JS 生成 4 个机位按钮 -->
+    </div>
+
+    <div class="director-row">
+        <button class="director-btn" id="directorBtn" onclick="selectDirector()">
+            <span class="dir-label">导播位</span>
+            <span class="dir-desc">可多人同时监看</span>
+        </button>
+    </div>
+
+    <div class="select-footer">
+        导播台 {{ state.switcher_ip }} &ensp;|&ensp; {{ state.web_ip }}:{{ state.web_port }}
+        <br>© 潍坊工商融媒体中心
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script>
+    const MAX = {{ max_channels }};
+    const channelGrid = document.getElementById("channelGrid");
+    const statusDot = document.getElementById("statusDot");
+    const statusText = document.getElementById("statusText");
+    const toast = document.getElementById("toast");
+    let currentOwners = {};
+
+    const socket = io();
+
+    // 生成机位按钮
+    for (let i = 1; i <= MAX; i++) {
+        const btn = document.createElement("button");
+        btn.className = "channel-btn free";
+        btn.id = "ch" + i;
+        btn.innerHTML = `<span class="num">${i}</span><span class="label">空闲</span>`;
+        btn.addEventListener("click", () => selectChannel(i));
+        channelGrid.appendChild(btn);
+    }
+
+    function updateButtons() {
+        for (let i = 1; i <= MAX; i++) {
+            const btn = document.getElementById("ch" + i);
+            if (!btn) continue;
+            const label = btn.querySelector(".label");
+            btn.classList.remove("free", "occupied");
+            if (currentOwners[i]) {
+                btn.classList.add("occupied");
+                if (label) label.textContent = "已占用";
+            } else {
+                btn.classList.add("free");
+                if (label) label.textContent = "空闲";
+            }
+        }
+    }
+
+    function selectChannel(ch) {
+        if (currentOwners[ch]) {
+            showToast("该机位已被占用");
+            return;
+        }
+        socket.emit("select_channel", { channel: ch });
+    }
+
+    function selectDirector() {
+        // 导播位无需锁定，直接跳转
+        window.location.href = "/tally/0";
+    }
+
+    // SocketIO events
+    socket.on("channel_assigned", function(data) {
+        sessionStorage.setItem("tally_channel", data.channel);
+        showToast("已选择机位 " + data.channel, true);
+        setTimeout(() => { window.location.href = "/tally/" + data.channel; }, 400);
+    });
+
+    socket.on("channel_rejected", function(data) {
+        showToast(data.reason || "机位分配失败");
+    });
+
+    socket.on("channel_list", function(data) {
+        currentOwners = data.owners;
+        updateButtons();
+    });
+
+    let lastIdxPgm = 0, lastIdxPvw = 0, lastIdxTrans = 0;
+
+    socket.on("tally_update", function(data) {
+        lastIdxPgm = data.pgm; lastIdxPvw = data.pvw; lastIdxTrans = data.transition || 0;
+        highlightButtons(data.pgm, data.pvw, data.transition || 0);
+    });
+
+    socket.on("connection_status", function(data) {
+        updateStatus(data.connected);
+    });
+
+    function highlightButtons(pgm, pvw, transition) {
+        for (let i = 1; i <= MAX; i++) {
+            const btn = document.getElementById("ch" + i);
+            if (!btn) continue;
+            btn.classList.remove("pgm-highlight", "pvw-highlight");
+            // 过渡中：PGM和PVW同时红
+            if (transition && (pgm === i || pvw === i)) {
+                btn.classList.add("pgm-highlight");
+            } else if (pgm === i) {
+                btn.classList.add("pgm-highlight");
+            } else if (pvw === i) {
+                btn.classList.add("pvw-highlight");
+            }
+        }
+    }
+
+    // 0.2秒轮询防卡死
+    setInterval(() => {
+        fetch("/api/state").then(r => r.json()).then(s => {
+            if (s.pgm !== lastIdxPgm || s.pvw !== lastIdxPvw || s.transition !== lastIdxTrans) {
+                lastIdxPgm = s.pgm; lastIdxPvw = s.pvw; lastIdxTrans = s.transition || 0;
+                highlightButtons(s.pgm, s.pvw, s.transition || 0);
+            }
+            updateStatus(s.switcher_connected);
+        }).catch(() => {});
+        socket.emit("get_channel_list");
+    }, 200);
+
+    function updateStatus(connected) {
+        statusDot.className = "status-dot " + (connected ? "connected" : "disconnected");
+        statusText.textContent = connected ? "导播台已连接" : "导播台未连接";
+    }
+
+    function showToast(msg, isSuccess) {
+        toast.textContent = msg;
+        toast.className = "toast " + (isSuccess ? "success" : "") + " show";
+        clearTimeout(toast._timer);
+        toast._timer = setTimeout(() => toast.classList.remove("show"), 2000);
+    }
+
+    // 防息屏：Wake Lock API
+    let wakeLock = null;
+    async function requestWakeLock() {
+        try {
+            if ("wakeLock" in navigator) {
+                wakeLock = await navigator.wakeLock.request("screen");
+            }
+        } catch(e) {}
+    }
+    requestWakeLock();
+    document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") requestWakeLock();
+    });
+
+    // 恢复之前选中的机位
+    const saved = sessionStorage.getItem("tally_channel");
+    if (saved) {
+        socket.emit("select_channel", { channel: parseInt(saved) });
+    }
+    </script>
+</body>
+</html>

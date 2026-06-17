@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+
+# Virtual environment
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# PyInstaller
+build/
+dist/
+*.spec
+
+# Runtime
+web-telly.log
+config.txt
+
+# OS
+.DS_Store
+Thumbs.db

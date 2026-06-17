@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>导播监看 - Tally</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="director-page">
+
+    <div class="director-header">
+        <h1>导播监看</h1>
+        <div class="switcher-status">
+            <span class="status-dot" id="statusDot"></span>
+            <span id="statusText">连接中...</span>
+        </div>
+    </div>
+
+    <!-- 机位 1-4 -->
+    <div class="section-label">机位</div>
+    <div class="director-grid" id="camGrid"></div>
+
+    <!-- 特殊通道 Still1/Still2/AUX/S/SRC -->
+    <div class="section-label">特殊通道</div>
+    <div class="director-grid" id="specialGrid"></div>
+
+    <div class="director-controls" id="controls"></div>
+
+    <div class="director-footer">
+        导播台 {{ state.switcher_ip }} &ensp;|&ensp;
+        PGM=<span id="pgmVal">-</span> PVW=<span id="pvwVal">-</span>
+        <br>© 潍坊工商融媒体中心
+    </div>
+
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script>
+    const MAX = {{ max_channels }};
+    const SPECIAL = {{ special_channels | tojson }};
+    const socket = io();
+    let currentOwners = {};
+
+    // ---- 生成机位 1-4 ----
+    const camGrid = document.getElementById("camGrid");
+    const controls = document.getElementById("controls");
+    for (let i = 1; i <= MAX; i++) {
+        const block = document.createElement("div");
+        block.className = "monitor-block tally-idle";
+        block.id = "cam" + i;
+        block.innerHTML = `<span class="monitor-num">${i}</span><span class="monitor-label" id="label${i}">机位 ${i}</span>`;
+        camGrid.appendChild(block);
+
+        const btn = document.createElement("button");
+        btn.className = "release-btn";
+        btn.id = "rel" + i;
+        btn.textContent = "释放机位 " + i;
+        btn.style.display = "none";
+        btn.addEventListener("click", () => {
+            if (confirm("确定强制释放机位 " + i + "？")) {
+                socket.emit("force_release", { channel: i });
+            }
+        });
+        controls.appendChild(btn);
+    }
+
+    // ---- 生成特殊通道（不锁定、不释放） ----
+    const specialGrid = document.getElementById("specialGrid");
+    const specialIds = {};
+    for (const [value, name] of Object.entries(SPECIAL)) {
+        const block = document.createElement("div");
+        block.className = "monitor-block tally-idle";
+        block.id = "spec" + value;
+        block.innerHTML = `<span class="monitor-num special-num">${name}</span><span class="monitor-label">${value}</span>`;
+        specialGrid.appendChild(block);
+        specialIds[parseInt(value)] = name;
+    }
+
+    // ---- 颜色更新 ----
+    function updateColors(pgm, pvw, transition) {
+        // 机位 1-4
+        for (let i = 1; i <= MAX; i++) {
+            const block = document.getElementById("cam" + i);
+            if (!block) continue;
+            block.classList.remove("tally-pgm", "tally-pvw", "tally-idle");
+            if (transition && (pgm === i || pvw === i)) {
+                block.classList.add("tally-pgm");
+            } else if (pgm === i) {
+                block.classList.add("tally-pgm");
+            } else if (pvw === i) {
+                block.classList.add("tally-pvw");
+            } else {
+                block.classList.add("tally-idle");
+            }
+        }
+        // 特殊通道
+        for (const [value, name] of Object.entries(SPECIAL)) {
+            const block = document.getElementById("spec" + value);
+            if (!block) continue;
+            const v = parseInt(value);
+            block.classList.remove("tally-pgm", "tally-pvw", "tally-idle");
+            if (transition && (pgm === v || pvw === v)) {
+                block.classList.add("tally-pgm");
+            } else if (pgm === v) {
+                block.classList.add("tally-pgm");
+            } else if (pvw === v) {
+                block.classList.add("tally-pvw");
+            } else {
+                block.classList.add("tally-idle");
+            }
+        }
+        document.getElementById("pgmVal").textContent = (pgm || "-") + (transition ? " 🔄" : "");
+        document.getElementById("pvwVal").textContent = (pvw || "-") + (transition ? " 🔄" : "");
+    }
+
+    function updateReleaseButtons(owners) {
+        currentOwners = owners;
+        for (let i = 1; i <= MAX; i++) {
+            const btn = document.getElementById("rel" + i);
+            const label = document.getElementById("label" + i);
+            if (!btn) continue;
+            if (owners[i]) {
+                btn.style.display = "inline-block";
+                btn.classList.add("occupied");
+                if (label) label.textContent = "机位 " + i + " (占用)";
+            } else {
+                btn.style.display = "none";
+                btn.classList.remove("occupied");
+                if (label) label.textContent = "机位 " + i;
+            }
+        }
+    }
+
+    socket.on("tally_update", function(data) { updateColors(data.pgm, data.pvw, data.transition || 0); });
+    socket.on("channel_list", function(data) { updateReleaseButtons(data.owners); });
+    socket.on("connection_status", function(data) {
+        document.getElementById("statusDot").className =
+            "status-dot " + (data.connected ? "connected" : "disconnected");
+        document.getElementById("statusText").textContent =
+            data.connected ? "导播台已连接" : "导播台未连接";
+    });
+
+    // 0.2秒轮询
+    let lastPgm = 0, lastPvw = 0, lastTrans = 0;
+    setInterval(() => {
+        fetch("/api/state").then(r => r.json()).then(s => {
+            if (s.pgm !== lastPgm || s.pvw !== lastPvw || s.transition !== lastTrans) {
+                lastPgm = s.pgm; lastPvw = s.pvw; lastTrans = s.transition || 0;
+                updateColors(s.pgm, s.pvw, s.transition || 0);
+            }
+        }).catch(() => {});
+    }, 200);
+
+    // 防息屏
+    let wakeLock = null;
+    async function requestWakeLock() {
+        try { if ("wakeLock" in navigator) wakeLock = await navigator.wakeLock.request("screen"); } catch(e) {}
+    }
+    requestWakeLock();
+    document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") requestWakeLock();
+    });
+    </script>
+</body>
+</html>

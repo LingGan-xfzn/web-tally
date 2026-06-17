@@ -1,0 +1,291 @@
+/* ==========================================
+   Tally Web 样式
+   ========================================== */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #1a1a2e;
+    color: #eee;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+}
+
+/* ==========================================
+   机位选择页 (index)
+   ========================================== */
+.select-page {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    padding: 16px;
+}
+.select-header {
+    text-align: center;
+    padding: 10px 0 16px;
+}
+.select-header h1 { font-size: 24px; font-weight: 700; margin-bottom: 6px; }
+.switcher-status { font-size: 13px; color: #999; }
+.status-dot {
+    display: inline-block; width: 10px; height: 10px;
+    border-radius: 50%; margin-right: 6px; vertical-align: middle;
+}
+.status-dot.connected { background: #0f0; box-shadow: 0 0 6px #0f0; }
+.status-dot.disconnected { background: #f33; box-shadow: 0 0 6px #f33; }
+
+.channel-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    max-width: 400px;
+    width: 100%;
+    margin: 0 auto;
+}
+.channel-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    aspect-ratio: 1;
+    border-radius: 16px;
+    border: 3px solid #555;
+    background: #252540;
+    color: #ccc;
+    font-size: 36px;
+    font-weight: 900;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.channel-btn:active { transform: scale(0.95); }
+.channel-btn .label { font-size: 12px; font-weight: 400; margin-top: 4px; color: #888; }
+.channel-btn.free { border-color: #2a8; color: #fff; }
+.channel-btn.free:hover { background: #2a3a30; }
+.channel-btn.occupied { border-color: #a33; color: #666; cursor: not-allowed; opacity: 0.6; }
+.channel-btn.pgm-highlight { border-color: #f00 !important; box-shadow: 0 0 20px #f00; }
+.channel-btn.pvw-highlight { border-color: #0f0 !important; box-shadow: 0 0 20px #0f0; }
+
+.director-row {
+    max-width: 400px;
+    width: 100%;
+    margin: 16px auto;
+}
+.director-btn {
+    width: 100%;
+    padding: 18px;
+    border-radius: 16px;
+    border: 3px solid #fa0;
+    background: #302800;
+    color: #fa0;
+    font-size: 20px;
+    font-weight: 700;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.2s;
+}
+.director-btn:active { transform: scale(0.97); }
+.director-btn .dir-label { display: block; }
+.director-btn .dir-desc { font-size: 12px; font-weight: 400; color: #a80; }
+
+.select-footer {
+    text-align: center;
+    padding: 16px 0 8px;
+    font-size: 11px;
+    color: #555;
+}
+
+/* Toast */
+.toast {
+    position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+    background: #c0392b; color: #fff; padding: 10px 24px;
+    border-radius: 8px; font-size: 14px; z-index: 9999;
+    opacity: 0; transition: opacity 0.3s; pointer-events: none;
+}
+.toast.show { opacity: 1; }
+.toast.success { background: #27ae60; }
+
+/* ==========================================
+   导播监看页 (director)
+   ========================================== */
+.director-page {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+    background: #111;
+}
+.director-header {
+    text-align: center;
+    padding: 10px 0 16px;
+}
+.director-header h1 { font-size: 22px; font-weight: 700; }
+.director-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 8px;
+    flex: 1;
+    min-height: 0;
+}
+.monitor-block {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    transition: background-color 0.3s;
+    min-height: 120px;
+}
+.monitor-block.tally-idle { background: #444; }
+.monitor-block.tally-pgm { background: #e00; }
+.monitor-block.tally-pvw { background: #0a0; }
+.monitor-num {
+    font-size: 8vw;
+    font-weight: 900;
+    color: #fff;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+.monitor-label {
+    font-size: 12px;
+    color: rgba(255,255,255,0.5);
+    margin-top: 4px;
+}
+.director-footer {
+    text-align: center;
+    padding: 12px 0 4px;
+    font-size: 12px;
+    color: #666;
+}
+
+/* ==========================================
+   Tally 全屏显示页 (tally)
+   ========================================== */
+.tally-page {
+    width: 100vw; height: 100vh; height: 100dvh;
+    display: flex; align-items: center; justify-content: center;
+    transition: background-color 0.3s ease;
+    overflow: hidden;
+}
+.tally-idle { background-color: #666; }
+.tally-pgm { background-color: #e00; }
+.tally-pvw { background-color: #0a0; }
+
+.tally-number {
+    font-size: 50vw;
+    font-weight: 900;
+    color: #fff;
+    line-height: 1;
+    text-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+
+.tally-info {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 6px 12px; font-size: 11px; color: rgba(255,255,255,0.4);
+    pointer-events: none;
+}
+.tally-release {
+    pointer-events: auto;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: rgba(255,255,255,0.5);
+    padding: 4px 12px; border-radius: 4px;
+    font-size: 12px; cursor: pointer; text-decoration: none;
+}
+.tally-release:hover { background: rgba(255,0,0,0.3); color: #fff; }
+
+.tally-status {
+    position: fixed; top: 8px; right: 12px;
+    font-size: 11px; color: rgba(255,255,255,0.4); pointer-events: none;
+}
+
+/* 断开覆盖层 */
+.disconnect-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.85);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    z-index: 1000; color: #fff; font-size: 18px; gap: 12px;
+}
+.disconnect-overlay .dot-pulse {
+    width: 12px; height: 12px; background: #f90;
+    border-radius: 50%; animation: pulse 1s infinite;
+}
+@keyframes pulse {
+    0%, 100% { opacity: 0.3; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.5); }
+}
+
+/* 导播位强释放按钮 */
+.director-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 0;
+    justify-content: center;
+}
+.release-btn {
+    padding: 6px 16px;
+    border: 1px solid #a33;
+    border-radius: 6px;
+    background: #300;
+    color: #f66;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.release-btn:hover { background: #600; color: #f00; }
+.release-btn.occupied { border-color: #f00; }
+
+/* 错误覆盖层（tally 页） */
+.error-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.9);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    z-index: 2000; color: #fff; font-size: 18px; gap: 20px;
+}
+.back-btn {
+    padding: 12px 32px;
+    background: #c0392b;
+    color: #fff;
+    border-radius: 8px;
+    text-decoration: none;
+    font-size: 16px;
+}
+
+/* 分区标签 */
+.section-label {
+    font-size: 13px;
+    color: #888;
+    padding: 8px 0 4px;
+    font-weight: 600;
+    letter-spacing: 2px;
+}
+
+/* 特殊通道名字较小 */
+.special-num {
+    font-size: 6vw !important;
+}
+
+/* 导播位全屏：8 格（2行×4列） */
+.tally-director-full {
+    width: 100vw; height: 100vh; height: 100dvh;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 3px;
+    overflow: hidden;
+}
+.tally-director-full .monitor-block {
+    border-radius: 0;
+    min-height: 0;
+}
+.tally-director-full .monitor-num {
+    font-size: 14vw;
+}
+.tally-director-full .special-num {
+    font-size: 10vw !important;
+}
