@@ -178,7 +178,7 @@ A: 用电脑打开导播监看页，点击对应机位的**释放按钮**强制�
 
 ## 致谢
 
-- **作者**：潍坊工商融媒体中心
+- **作者**：潍坊工商融媒体中心 灵感
 - **灵感来源**：[OmniTally](https://github.com/OmniDamon/OmniTally) by OmniDamon
 - **技术栈**：Flask、Flask-SocketIO、tkinter、PyInstaller
 
