@@ -191,7 +191,7 @@ A: Use the Director view to force-release the position with the **Release** butt
 
 ## Credits
 
-- **Author**: Weifang Industrial and Commercial Media Center (潍坊工商融媒体中心)
+- **Author**: Weifang Industrial and Commercial Media Center (潍坊工商融媒体中心 灵感)
 - **Inspired by**: [OmniTally](https://github.com/OmniDamon/OmniTally) by OmniDamon
 - **Built with**: Flask, Flask-SocketIO, tkinter, PyInstaller
 
